@@ -1,3 +1,62 @@
 spring:
   application:
     name: ticketing-platform
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Everything below is overridable through environment variables (12-factor).
+# No credentials live here: AWS credentials come from the default provider chain
+# (ECS task role in AWS, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars locally).
+app:
+  aws:
+    region: ${AWS_REGION:us-east-1}
+  dynamodb:
+    endpoint: ${DYNAMODB_ENDPOINT:}
+    bootstrap-tables: ${DYNAMODB_BOOTSTRAP_TABLES:false}
+    events-table: ${DYNAMODB_EVENTS_TABLE:ticketing-events}
+    tickets-table: ${DYNAMODB_TICKETS_TABLE:ticketing-tickets}
+    orders-table: ${DYNAMODB_ORDERS_TABLE:ticketing-orders}
+    audit-table: ${DYNAMODB_AUDIT_TABLE:ticketing-ticket-audit}
+  sqs:
+    endpoint: ${SQS_ENDPOINT:}
+    queue-name: ${SQS_QUEUE_NAME:ticketing-orders}
+    listener-enabled: ${SQS_LISTENER_ENABLED:true}
+    wait-time-seconds: 20
+    max-messages: 10
+    concurrency: ${SQS_CONCURRENCY:8}
+    visibility-timeout-seconds: 60
+    processing-retries: 3
+    publish-retries: 3
+  reservation:
+    ttl: 10m
+    release-interval: ${RESERVATION_RELEASE_INTERVAL:30s}
+    release-batch-size: 100
+    scheduler-enabled: ${RESERVATION_SCHEDULER_ENABLED:true}
+  purchase:
+    max-tickets-per-order: 10
+  rate-limit:
+    capacity: ${RATE_LIMIT_CAPACITY:50}
+    refill-per-second: ${RATE_LIMIT_REFILL_PER_SECOND:25}
+    max-clients: 10000
+    trust-forwarded-for: ${RATE_LIMIT_TRUST_FORWARDED_FOR:false}
+  security:
+    admin-token: ${ADMIN_TOKEN:}
+  availability-stream-interval: 2s
