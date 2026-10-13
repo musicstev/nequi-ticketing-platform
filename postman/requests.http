@@ -1,0 +1,70 @@
+### REST Client / IntelliJ HTTP file. Variables are captured from responses with the `# @name` syntax.
+@baseUrl = http://localhost:8080
+@adminToken = local-admin-token
+@idempotencyKey = http-file-{{$timestamp}}
+
+### Create event
+# @name createEvent
+POST {{baseUrl}}/api/v1/events
+Content-Type: application/json
+
+{"name":"Rock Night","date":"2035-06-01T20:00:00Z","venue":"Arena","capacity":50}
+
+###
+@eventId = {{createEvent.response.body.$.id}}
+
+### List events
+GET {{baseUrl}}/api/v1/events
+
+### Availability
+GET {{baseUrl}}/api/v1/events/{{eventId}}/availability
+
+### Availability stream (SSE, stays open)
+GET {{baseUrl}}/api/v1/events/{{eventId}}/availability/stream
+Accept: text/event-stream
+
+### Purchase (202 Accepted)
+# @name purchase
+POST {{baseUrl}}/api/v1/orders
+Content-Type: application/json
+Idempotency-Key: {{idempotencyKey}}
+
+{"eventId":"{{eventId}}","customerId":"customer-001","quantity":2}
+
+###
+@orderId = {{purchase.response.body.$.orderId}}
+
+### Replay the same key (same orderId)
+POST {{baseUrl}}/api/v1/orders
+Content-Type: application/json
+Idempotency-Key: {{idempotencyKey}}
+
+{"eventId":"{{eventId}}","customerId":"customer-001","quantity":2}
+
+### Order status (repeat until PENDING_CONFIRMATION)
+GET {{baseUrl}}/api/v1/orders/{{orderId}}
+
+### Confirm
+POST {{baseUrl}}/api/v1/orders/{{orderId}}/confirm
+
+### Complimentary with admin token (201)
+POST {{baseUrl}}/api/v1/events/{{eventId}}/complimentary
+Content-Type: application/json
+X-Admin-Token: {{adminToken}}
+
+{"quantity":2}
+
+### Complimentary without token (403)
+POST {{baseUrl}}/api/v1/events/{{eventId}}/complimentary
+Content-Type: application/json
+
+{"quantity":1}
+
+### Unknown event (404)
+GET {{baseUrl}}/api/v1/events/nope/availability
+
+### Missing Idempotency-Key (400)
+POST {{baseUrl}}/api/v1/orders
+Content-Type: application/json
+
+{"eventId":"{{eventId}}","customerId":"customer-001","quantity":1}
