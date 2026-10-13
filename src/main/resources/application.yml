@@ -46,7 +46,7 @@ app:
     processing-retries: 3
     publish-retries: 3
   reservation:
-    ttl: 10m
+    ttl: ${RESERVATION_TTL:10m}
     release-interval: ${RESERVATION_RELEASE_INTERVAL:30s}
     release-batch-size: 100
     scheduler-enabled: ${RESERVATION_SCHEDULER_ENABLED:true}

@@ -1,0 +1,59 @@
+# Local stack: the application + DynamoDB Local + LocalStack (SQS only).
+# The credentials below are throwaway dummies required by the AWS SDK (DynamoDB Local only accepts alphanumeric ids); they grant nothing.
+# Override ADMIN_TOKEN (and anything else) through your shell or an untracked .env file.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # Any HTTP answer (even 400) proves the listener is up.
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  localstack:
+    # Pinned: newer "latest" images require a LocalStack auth token.
+    image: localstack/localstack:3.8.1
+    environment:
+      SERVICES: sqs
+      SQS_ENDPOINT_STRATEGY: path
+      SQS_QUEUE_NAME: ticketing-orders
+      DEBUG: "0"
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./docker/localstack/init-sqs.sh:/etc/localstack/init/ready.d/10-init-sqs.sh:ro
+    healthcheck:
+      # Healthy only after the init script created the queue.
+      test: ["CMD-SHELL", "awslocal sqs get-queue-url --queue-name ticketing-orders >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build: .
+    depends_on:
+      dynamodb:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: localdummy
+      AWS_SECRET_ACCESS_KEY: localdummy
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      DYNAMODB_BOOTSTRAP_TABLES: "true"
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_QUEUE_NAME: ticketing-orders
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-local-admin-token}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /actuator/health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q \"\\\"UP\\\"\" <&3'"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+      start_period: 40s
