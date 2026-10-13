@@ -8,3 +8,6 @@ target/
 .terraform/
 *.tfstate
 *.tfstate.*
+backend.hcl
+*.auto.tfvars
+.atl/

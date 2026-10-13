@@ -1,0 +1,8 @@
+# Copy to backend.hcl (git-ignored) and fill in. Create the bucket (versioning + SSE-KMS + block public
+# access) and the lock table (hash key LockID, string) once, outside this configuration.
+bucket         = "CHANGE_ME-ticketing-tfstate-prod"
+key            = "ticketing/prod/terraform.tfstate"
+region         = "us-east-1"
+encrypt        = true
+dynamodb_table = "CHANGE_ME-ticketing-tflock-prod"
+# Terraform >= 1.10 can lock with S3 alone: replace dynamodb_table with  use_lockfile = true
